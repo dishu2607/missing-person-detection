@@ -1,0 +1,24 @@
+# Node modules (frontend)
+frontend/node_modules/
+
+# Python virtual environment (backend)
+backend/venv/
+
+# Build and dist files
+frontend/.next/
+frontend/out/
+frontend/dist/
+backend/__pycache__/
+backend/*.pyc
+
+# Environment files
+*.env
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log

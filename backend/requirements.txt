@@ -1,0 +1,27 @@
+# FastAPI server
+fastapi==0.111.0
+uvicorn==0.25.0
+python-multipart==0.0.6
+pydantic==2.6.0
+
+# Database & search
+pymongo==4.6.0
+faiss-cpu==1.7.4
+
+# ML / CV
+torch==2.3.1+cu121
+torchvision==0.18.1+cu121
+opencv-python==4.8.1.78
+pillow==10.1.0
+numpy==1.26.4
+
+# Object detection
+ultralytics==8.0.140
+
+# Face recognition
+git+https://github.com/deepinsight/insightface.git@master
+
+# ONNX runtime for InsightFace
+onnxruntime-gpu==1.15.1
+
+
