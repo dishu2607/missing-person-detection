@@ -36,7 +36,7 @@ async def upload_video(video: UploadFile = File(...), metadata: dict = {}):
 
     # Save uploaded video
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    video_folder = os.path.join(BASE_VIDEO_DIR, f"{job_id}_{timestamp}")
+    video_folder = os.path.join(BASE_VIDEO_DIR, f"{job_id}")
     os.makedirs(video_folder, exist_ok=True)
 
     video_path = os.path.join(video_folder, video.filename)
