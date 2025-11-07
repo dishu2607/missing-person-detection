@@ -35,7 +35,7 @@ export const api = {
     return res.json();
   },
 
-  async compareReference(referenceId: string, jobId: string | null = null, topK: number = 10) {
+  async compareReference(referenceId: string, jobId: string | null = null, topK: number = 20) {
     console.log('Comparing with:', { referenceId, jobId, topK });
     
     const body: any = {

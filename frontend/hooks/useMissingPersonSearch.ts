@@ -85,7 +85,7 @@ export function useMissingPersonSearch() {
       const data = await api.compareReference(
         refId,
         searchAllVideos ? null : videoJobId,
-        10 // Top 10 matches
+        20 // Top 10 matches
       );
       
       setCompareResults(data.matches || []);
