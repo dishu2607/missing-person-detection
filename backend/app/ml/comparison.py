@@ -7,7 +7,7 @@ from app.db.mongo import db
 
 
 class VideoComparison:
-    def __init__(self, final_threshold=0.35, emb_weight=0.8, meta_weight=0.2, top_k=10):
+    def __init__(self, final_threshold=0.35, emb_weight=0.8, meta_weight=0.2, top_k=20):
         """
         final_threshold: Minimum combined similarity score to count as a match.
         emb_weight/meta_weight: How much to weigh embedding vs metadata similarity.

@@ -9,7 +9,7 @@ router = APIRouter()
 class CompareRequest(BaseModel):
     reference_id: str
     job_id: Optional[str] = None
-    top_k: int = 10
+    top_k: int = 20
 
 @router.post("/")
 async def compare_reference_to_videos(req: CompareRequest):

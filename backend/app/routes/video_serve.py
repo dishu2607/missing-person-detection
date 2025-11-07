@@ -196,7 +196,7 @@ async def debug_videos():
         "video_base_directory": str(VIDEO_BASE_DIR.absolute()),
         "exists": VIDEO_BASE_DIR.exists(),
         "total_job_folders": len(job_folders),
-        "job_folders": job_folders[:10]  # Show first 10
+        "job_folders": job_folders[:20]  # Show first 10
     }
 
 @router.get("/debug/{job_id}")
