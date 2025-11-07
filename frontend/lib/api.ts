@@ -36,7 +36,7 @@ export const api = {
   },
 
   async compareReference(referenceId: string, jobId: string | null = null, topK: number = 10) {
-    console.log('🔍 Comparing with:', { referenceId, jobId, topK });
+    console.log('Comparing with:', { referenceId, jobId, topK });
     
     const body: any = {
       reference_id: referenceId,
@@ -48,19 +48,15 @@ export const api = {
       body.job_id = jobId;
     }
 
-    console.log('📤 Request body:', body);
-
-    const res = await fetch(`${API_BASE}/compare/`, {  // ✅ FIXED: Parenthesis before backtick!
+    const res = await fetch(`${API_BASE}/compare/`, {  // FIXED: Added backticks properly
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-    console.log('📥 Response status:', res.status);
-
     if (!res.ok) {
       const errorText = await res.text();
-      console.error('❌ Compare API error:', errorText);
+      console.error('Compare API error:', errorText);
       try {
         const errorJson = JSON.parse(errorText);
         throw new Error(errorJson.detail || "Failed to compare");
@@ -68,10 +64,7 @@ export const api = {
         throw new Error(`Failed to compare: ${errorText}`);
       }
     }
-    
-    const data = await res.json();
-    console.log('✅ Comparison response:', data);
-    return data;
+    return res.json();
   },
 
   getImageUrl(filename: string) {

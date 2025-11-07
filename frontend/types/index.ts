@@ -5,6 +5,7 @@ export interface ReferenceResult {
   age: number;
   color?: number[];
   crop_path?: string;
+  crop_filename?: string;  // ADD THIS
 }
 
 export interface CompareResult {
@@ -17,8 +18,8 @@ export interface CompareResult {
   video_name: string;
   job_id: string;
   video_crop: string;
-  frame_number: number;  // NEW
-  timestamp: string;      // NEW
+  frame_number: number;
+  timestamp: string;
   vid_age: number;
   vid_gender: string;
   vid_color?: number[];
