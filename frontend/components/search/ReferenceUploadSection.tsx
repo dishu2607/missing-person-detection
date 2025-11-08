@@ -133,26 +133,7 @@ export function ReferenceUploadSection({
 
             <div className="space-y-4">
               {/* Search Mode Toggle */}
-              <div className="bg-gray-700/30 rounded-xl p-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={searchAllVideos}
-                    onChange={(e) => setSearchAllVideos(e.target.checked)}
-                    className="mt-1 w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                  />
-                  <div>
-                    <span className="text-white font-medium block mb-1">
-                      Search All Videos
-                    </span>
-                    <span className="text-gray-400 text-sm">
-                      {searchAllVideos
-                        ? "Searching across entire CCTV database"
-                        : "Search only in specific video (enter Job ID below)"}
-                    </span>
-                  </div>
-                </label>
-              </div>
+             
 
               {/* Tips */}
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">

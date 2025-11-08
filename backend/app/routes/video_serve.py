@@ -128,13 +128,14 @@ async def get_video_thumbnail(
 async def get_video_info(job_id: str):
     """
     Get video metadata (duration, fps, resolution)
+    ✅ Returns real FPS, frame count, and duration.
     """
     job_dir = VIDEO_BASE_DIR / job_id
     
     if not job_dir.exists():
         raise HTTPException(status_code=404, detail=f"Video folder not found: {job_id}")
     
-    # Find video file
+    # Find first valid video file
     video_path = None
     video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.MP4', '.AVI', '.MOV']
     for file in job_dir.iterdir():
@@ -144,24 +145,33 @@ async def get_video_info(job_id: str):
     
     if not video_path:
         raise HTTPException(status_code=404, detail=f"Video file not found in {job_id}")
-    
+
+    # ✅ Extract info using OpenCV
     cap = cv2.VideoCapture(str(video_path))
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    duration = frame_count / fps if fps > 0 else 0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     cap.release()
-    
+
+    # Handle bad FPS readings (some videos return 0 or NaN)
+    if not fps or fps <= 1:
+        print(f"⚠️ Invalid FPS ({fps}) for {video_path.name}, defaulting to 30.0")
+        fps = 30.0
+
+    duration = frame_count / fps if fps > 0 else 0
+    print(f"🎞️ Video Info → {video_path.name}: {frame_count} frames, {fps:.2f} fps, {duration:.2f}s total")
+
     return {
         "job_id": job_id,
         "filename": video_path.name,
-        "fps": fps,
+        "fps": round(float(fps), 2),
         "frame_count": frame_count,
-        "duration_seconds": duration,
+        "duration_seconds": round(float(duration), 2),
         "duration_formatted": f"{int(duration // 60):02d}:{int(duration % 60):02d}",
         "resolution": f"{width}x{height}"
     }
+
 
 @router.get("/debug")
 async def debug_videos():
@@ -227,3 +237,39 @@ async def debug_specific_job(job_id: str):
         "exists": True,
         "files": files
     }
+
+
+def get_video_info_sync(job_id: str):
+    """
+    Synchronous helper for ML/comparison pipelines.
+    Reads FPS, frame count, and duration directly from disk (not through FastAPI).
+    """
+    job_dir = VIDEO_BASE_DIR / job_id
+    if not job_dir.exists():
+        print(f"⚠️ Video directory not found: {job_dir}")
+        return {"fps": 30.0, "duration": 0, "frames": 0}
+
+    video_path = None
+    for file in job_dir.iterdir():
+        if file.suffix.lower() in [".mp4", ".avi", ".mov", ".mkv"]:
+            video_path = file
+            break
+
+    if not video_path or not video_path.exists():
+        print(f"⚠️ No video file found in {job_dir}")
+        return {"fps": 30.0, "duration": 0, "frames": 0}
+
+    cap = cv2.VideoCapture(str(video_path))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+
+    # Handle invalid FPS
+    if not fps or fps <= 1:
+        print(f"⚠️ Invalid FPS ({fps}) for {video_path.name}, defaulting to 30.0")
+        fps = 30.0
+
+    duration = frame_count / fps if fps > 0 else 0
+    print(f"🎞️ [SYNC INFO] {video_path.name}: {frame_count} frames, {fps:.2f} fps, {duration:.2f}s total")
+
+    return {"fps": round(float(fps), 2), "duration": round(float(duration), 2), "frames": frame_count}

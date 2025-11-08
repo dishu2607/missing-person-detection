@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from bson import ObjectId
 from app.db.mongo import db
+from app.routes.video_serve import get_video_info_sync  # ✅ use only the sync helper
 
 
 class VideoComparison:
@@ -18,6 +19,9 @@ class VideoComparison:
         self.meta_weight = meta_weight
         self.top_k = top_k
 
+    # -------------------------------------------------------------------------
+    # Utility Methods
+    # -------------------------------------------------------------------------
     def _safe_convert(self, value):
         """Safely convert values to JSON-serializable format"""
         if value is None:
@@ -37,10 +41,7 @@ class VideoComparison:
         return value
 
     def _metadata_similarity(self, ref_meta, vid_meta):
-        """
-        Compute metadata similarity score between reference and video person.
-        Returns a value between 0 and 1.
-        """
+        """Compute metadata similarity score between reference and video person"""
         if not ref_meta or not vid_meta:
             return 0.0
 
@@ -76,25 +77,35 @@ class VideoComparison:
             frame_part = filename.split('_frame_')[-1]
             frame_num = int(frame_part.split('.')[0])
             return frame_num
-        except:
+        except Exception:
             return 0
 
-    def _calculate_timestamp(self, frame_number, fps=30):
+    def _calculate_timestamp(self, frame_number, fps=30.0):
         """Convert frame number to timestamp"""
         total_seconds = frame_number / fps
         minutes = int(total_seconds // 60)
         seconds = int(total_seconds % 60)
         return f"{minutes:02d}:{seconds:02d}"
 
+    def _get_fps_for_video(self, job_id: str):
+        """Fetch real FPS dynamically for each video using the sync helper."""
+        try:
+            video_info = get_video_info_sync(job_id)
+            fps = float(video_info.get("fps", 30.0))
+            if fps > 0:
+                print(f"🎬 Using FPS={fps} for job_id={job_id}")
+                return fps
+        except Exception as e:
+            print(f"⚠️ Could not fetch FPS for job_id {job_id}: {e}")
+        return 30.0
+
+    # -------------------------------------------------------------------------
+    # Core Comparison Logic
+    # -------------------------------------------------------------------------
     def compare_reference(self, reference_id: str, job_id: str = None):
-        """
-        Compare a single reference embedding against ALL video embeddings in database.
-        If job_id is provided, filter by that job. Otherwise search all videos.
-        Returns top K matches sorted by final_score.
-        """
+        """Compare a single reference embedding against ALL video embeddings"""
         print(f"\n🔍 Starting comparison for reference: {reference_id}")
         
-        # Load reference embedding
         ref_collection_name = os.getenv("COLLECTION_NAME", "reference_embeddings")
         
         # Try to find by ObjectId first, then by person_id
@@ -103,7 +114,7 @@ class VideoComparison:
             try:
                 ref_doc = db[ref_collection_name].find_one({"_id": ObjectId(reference_id)})
                 print(f"   Found by ObjectId: {reference_id}")
-            except:
+            except Exception:
                 pass
         
         if not ref_doc:
@@ -115,7 +126,6 @@ class VideoComparison:
             print(f"⚠️ No reference found for id/person_id: {reference_id}")
             return []
 
-        # Extract reference info - convert everything to safe types
         ref_emb = np.array(ref_doc["embedding"]).reshape(1, -1)
         ref_meta = {
             "person_id": str(ref_doc.get("person_id", "")),
@@ -124,19 +134,14 @@ class VideoComparison:
             "color": self._safe_convert(ref_doc.get("color")),
             "crop_path": str(ref_doc.get("crop_path", "")),
         }
-        
+
         print(f"   Reference metadata: person_id={ref_meta['person_id']}, gender={ref_meta['gender']}, age={ref_meta['age']}")
 
-        # Load video embeddings (filter by job_id if provided)
-        query = {}
-        if job_id:
-            query["job_id"] = job_id
-            print(f"   Searching in job_id: {job_id}")
-        else:
-            print(f"   Searching ALL videos in database")
+        # Load video embeddings
+        query = {"job_id": job_id} if job_id else {}
+        print(f"   Searching {'job_id ' + job_id if job_id else 'ALL videos in database'}")
             
         video_emb_docs = list(db.embeddings.find(query))
-        
         if not video_emb_docs:
             print(f"⚠️ No video embeddings found in database{' for job_id: ' + job_id if job_id else ''}")
             return []
@@ -144,13 +149,13 @@ class VideoComparison:
         print(f"   Found {len(video_emb_docs)} video embeddings to compare")
 
         matches = []
+        fps_cache = {}  # avoid redundant lookups
 
         for idx, v_doc in enumerate(video_emb_docs):
             try:
                 video_emb = np.array(v_doc["embedding"]).reshape(1, -1)
                 emb_similarity = cosine_similarity(ref_emb, video_emb)[0][0]
 
-                # Video metadata - convert to safe types
                 vid_meta = {
                     "age": int(v_doc.get("age", 0)) if v_doc.get("age") else None,
                     "gender": str(v_doc.get("gender", "")),
@@ -158,13 +163,17 @@ class VideoComparison:
                 }
 
                 meta_similarity = self._metadata_similarity(ref_meta, vid_meta)
-
-                # Combine embedding + metadata scores
                 final_score = (self.emb_weight * emb_similarity) + (self.meta_weight * meta_similarity)
 
-                # Extract frame info
                 frame_number = self._extract_frame_number(v_doc.get("crop_path", ""))
-                timestamp = self._calculate_timestamp(frame_number)
+                job_id_for_fps = str(v_doc.get("job_id", job_id or ""))
+
+                # ✅ Dynamically get fps per video
+                if job_id_for_fps not in fps_cache:
+                    fps_cache[job_id_for_fps] = self._get_fps_for_video(job_id_for_fps)
+                fps = fps_cache[job_id_for_fps]
+
+                timestamp = self._calculate_timestamp(frame_number, fps=fps)
 
                 if final_score >= self.final_threshold:
                     match = {
@@ -174,40 +183,32 @@ class VideoComparison:
                         "ref_age": ref_meta["age"],
                         "ref_gender": ref_meta["gender"],
                         "ref_color": ref_meta["color"],
-
                         "video_name": str(v_doc.get("video_name", "")),
-                        "job_id": str(v_doc.get("job_id", "")),
+                        "job_id": job_id_for_fps,
                         "video_crop": str(v_doc.get("crop_path", "")),
                         "frame_number": int(frame_number),
                         "timestamp": str(timestamp),
                         "vid_age": vid_meta["age"],
                         "vid_gender": vid_meta["gender"],
                         "vid_color": vid_meta["color"],
-
                         "face_similarity": float(emb_similarity),
                         "meta_similarity": float(meta_similarity),
                         "final_score": float(final_score),
                         "detected_at": str(datetime.utcnow())
                     }
-                    
-                    # Double-check all values are JSON serializable
-                    match = self._safe_convert(match)
-                    matches.append(match)
-                    
+                    matches.append(self._safe_convert(match))
+
                     if idx % 100 == 0 and idx > 0:
                         print(f"   Processed {idx} embeddings, {len(matches)} matches so far...")
-                        
+
             except Exception as e:
                 print(f"⚠️ Error processing video embedding {idx}: {str(e)}")
                 import traceback
                 traceback.print_exc()
                 continue
 
-        # Sort by final_score descending and take top K
         matches.sort(key=lambda x: x["final_score"], reverse=True)
         top_matches = matches[:self.top_k]
 
-        # DON'T save to database yet - just return
-        # Saving can cause ObjectId issues
         print(f"✅ Comparison complete: {len(top_matches)} top matches (from {len(matches)} total) for reference {ref_meta['person_id']}\n")
         return top_matches
